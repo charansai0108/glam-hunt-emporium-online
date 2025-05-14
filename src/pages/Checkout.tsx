@@ -37,7 +37,7 @@ const orderSummary = {
 
 // Load Razorpay script
 const loadRazorpayScript = () => {
-  return new Promise((resolve) => {
+  return new Promise<boolean>((resolve) => {
     const script = document.createElement('script');
     script.src = 'https://checkout.razorpay.com/v1/checkout.js';
     script.onload = () => {
