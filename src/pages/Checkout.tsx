@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '@/components/Header';
 import Footer from '@/components/Footer';
@@ -7,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
 
 // Mock checkout data
 const orderSummary = {
@@ -36,6 +35,21 @@ const orderSummary = {
   ]
 };
 
+// Load Razorpay script
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => {
+      resolve(true);
+    };
+    script.onerror = () => {
+      resolve(false);
+    };
+    document.body.appendChild(script);
+  });
+};
+
 const Checkout = () => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
@@ -51,6 +65,22 @@ const Checkout = () => {
     saveInfo: false,
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadRazorpay = async () => {
+      const isLoaded = await loadRazorpayScript();
+      setRazorpayLoaded(isLoaded);
+      if (!isLoaded) {
+        toast({
+          title: "Payment Error",
+          description: "Failed to load payment gateway. Please try again later.",
+          variant: "destructive",
+        });
+      }
+    };
+    loadRazorpay();
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
@@ -58,6 +88,82 @@ const Checkout = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  const displayRazorpay = async () => {
+    if (!razorpayLoaded) {
+      toast({
+        title: "Payment Error",
+        description: "Payment gateway is not loaded. Please try again later.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // This would typically be fetched from your backend
+      const orderData = {
+        id: "order_" + Math.floor(Math.random() * 1000000),
+        amount: orderSummary.total * 100, // Amount in smallest currency unit (paise for INR)
+        currency: "INR",
+        receipt: "receipt_" + Math.floor(Math.random() * 1000000)
+      };
+
+      const options = {
+        key: "rzp_test_yourtestkey", // Replace with your actual Razorpay test key
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "Glam Hunt",
+        description: "Payment for your order",
+        order_id: orderData.id,
+        handler: function (response: any) {
+          // This handler is called when payment is successful
+          const paymentData = {
+            orderCreationId: orderData.id,
+            razorpayPaymentId: response.razorpay_payment_id,
+            razorpayOrderId: response.razorpay_order_id,
+            razorpaySignature: response.razorpay_signature,
+          };
+          
+          // Here you would typically send this data to your backend
+          console.log("Payment successful:", paymentData);
+          
+          // Navigate to confirmation page
+          navigate('/order-confirmation');
+        },
+        prefill: {
+          name: `${formData.firstName} ${formData.lastName}`,
+          email: formData.email,
+          contact: formData.phone,
+        },
+        notes: {
+          address: `${formData.address}, ${formData.city}, ${formData.state}, ${formData.zipCode}`,
+        },
+        theme: {
+          color: "#000000",
+        },
+        modal: {
+          ondismiss: function() {
+            setIsProcessing(false);
+            toast({
+              title: "Payment Cancelled",
+              description: "Your payment process was cancelled.",
+            });
+          },
+        },
+      };
+
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (error) {
+      console.error("Error during payment:", error);
+      setIsProcessing(false);
+      toast({
+        title: "Payment Error",
+        description: "There was an error processing your payment. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -68,18 +174,19 @@ const Checkout = () => {
     const emptyFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
     
     if (emptyFields.length > 0) {
-      toast.error(`Please fill out all required fields`);
+      toast({
+        title: "Missing Information",
+        description: "Please fill out all required fields",
+        variant: "destructive",
+      });
       return;
     }
     
     // Process payment
     setIsProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(() => {
-      // Redirect to confirmation page on success
-      navigate('/order-confirmation');
-    }, 2000);
+    // Initiate Razorpay payment
+    displayRazorpay();
   };
 
   return (
@@ -213,6 +320,10 @@ const Checkout = () => {
                 <div className="mb-8">
                   <h2 className="font-bebas text-xl mb-4 tracking-wide">PAYMENT METHOD</h2>
                   <div className="bg-gray-50 p-4 rounded-sm">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <img src="https://razorpay.com/favicon.png" alt="Razorpay Logo" className="h-5 w-5" />
+                      <span className="font-medium">Razorpay Secure Payment</span>
+                    </div>
                     <p className="text-sm">
                       All payments are processed securely through Razorpay. We do not store your payment information.
                     </p>
