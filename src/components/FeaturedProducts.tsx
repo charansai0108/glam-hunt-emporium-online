@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ export type Product = {
   isNew?: boolean;
   isSale?: boolean;
   discountPercentage?: number;
+  description?: string;
 };
 
 const FEATURED_PRODUCTS: Product[] = [
@@ -49,7 +49,7 @@ const FEATURED_PRODUCTS: Product[] = [
 ];
 
 const ProductCard = ({ product }: { product: Product }) => {
-  const { id, name, price, image, category, isNew, isSale, discountPercentage } = product;
+  const { id, name, price, image, category, isNew, isSale, discountPercentage, description } = product;
   
   const displayPrice = isSale && discountPercentage 
     ? price * (1 - discountPercentage / 100) 
@@ -91,6 +91,9 @@ const ProductCard = ({ product }: { product: Product }) => {
             <span className="font-medium">${price.toFixed(2)}</span>
           )}
         </div>
+        {description && (
+          <p className="text-gray-600 text-sm mt-2">{description}</p>
+        )}
       </div>
     </div>
   );
